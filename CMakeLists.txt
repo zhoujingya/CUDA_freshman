@@ -6,3 +6,4 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 add_subdirectory(01_hello_world)
 add_subdirectory(02_vector_add)
+add_subdirectory(03_matrix_multiplication)
