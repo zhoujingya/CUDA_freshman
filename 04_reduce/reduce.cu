@@ -21,6 +21,7 @@ __global__ void reduce(int *input, int *output, int n) {
   auto tile = cg::tiled_partition<32>(blocks);
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   temp[tid / 32] = cg::reduce(tile, input[tid], cg::plus<int>());
+  __syncthreads();
   if (tid == 0) {
     for (int i = 0; i < WARP_NUM; i++) {
       * output += temp[i];
