@@ -36,17 +36,25 @@ int main(int argc, char **argv) {
     h_input[i] = i;
     cpu_output += h_input[i];
   }
-
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
   int *d_input, *d_output;
   cudaMalloc(&d_input, N * sizeof(int));
   cudaMalloc(&d_output, sizeof(int));
 
   cudaMemcpy(d_input, h_input, N * sizeof(int), cudaMemcpyHostToDevice);
   cudaMemcpy(d_output, h_output, sizeof(int), cudaMemcpyHostToDevice);
+   cudaEventRecord(start);
   // launch the kernel
   reduce<<<1, N>>>(d_input, d_output, N);
+  cudaEventRecord(stop);
   // copy the result back to the host
   cudaMemcpy(h_output, d_output, sizeof(int), cudaMemcpyDeviceToHost);
+  cudaEventSynchronize(stop);
+  float milliseconds = 0;
+  cudaEventElapsedTime(&milliseconds, start, stop);
+  printf("Time taken: %f ms\n", milliseconds);
 
   if (cpu_output == *h_output) {
     printf("Success\n");
