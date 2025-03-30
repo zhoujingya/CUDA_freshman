@@ -3,3 +3,4 @@
 * [02-vector_add](02_vector_add/vecadd.cu)
 * [03-matirx_multilication](03_matrix_multiplication/matrix_multiplication.cu)
 * [04-reduce](04_reduce/reduce.cu)
+* [05-sum2DMat](05_sum2DMat/sum2DMat.cu)
