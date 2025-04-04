@@ -1,0 +1,1 @@
+add_executable(warp_level_func warp_level_func.cu)
