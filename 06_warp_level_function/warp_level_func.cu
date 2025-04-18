@@ -13,6 +13,12 @@ enum Operation {
   XOR,
 };
 
+enum Shuffle_Operation {
+  SHUFFLE_UP,
+  SHUFFLE_DOWN,
+  SHUFFLE_XOR,
+};
+
 __global__ void test_warp_vote_function() {
   int tid = threadIdx.x;
   auto tmp = __any_sync(0xffffffff, tid != 0);
@@ -70,6 +76,35 @@ __global__ void test_warp_reduce_function(int *data, int *result) {
   }
 }
 
+template <Shuffle_Operation Operation>
+__global__ void test_warp_shuffle_function(int *data, int *result) {
+  int tid = threadIdx.x;
+  if (tid == 0) {
+    switch (Operation) {
+    case SHUFFLE_UP:
+      // Shuffle up: each thread obtains data from the thread with a lower ID
+      // relative to the caller
+      *result = __shfl_up_sync(__activemask(), data[tid], tid);
+      break;
+    case SHUFFLE_DOWN:
+      // Shuffle down: each thread obtains data from the thread with a higher ID
+      // relative to the caller
+      *result = __shfl_down_sync(__activemask(), data[tid], tid);
+      break;
+    case SHUFFLE_XOR:
+      // Shuffle XOR: each thread exchanges data with another thread based on
+      // bitwise XOR of their thread IDs
+      *result = __shfl_xor_sync(__activemask(), data[tid], tid);
+      break;
+    default:
+      // Default shuffle: direct exchange where each thread can obtain a value
+      // from any other thread in the warp
+      *result = __shfl_sync(__activemask(), data[tid], tid);
+      break;
+    }
+  }
+}
+
 template <Operation Operation> int cpu_reduce_function(int *data) {
   int sum = 0;
   for (int i = 0; i < THREADS; i++) {
@@ -89,6 +124,19 @@ template <Operation Operation> int cpu_reduce_function(int *data) {
     }
   }
   return sum;
+}
+
+template <Shuffle_Operation Operation> int cpu_shuffle_function(int *data) {
+  switch (Operation) {
+  case SHUFFLE_UP:
+    return data[0];
+  case SHUFFLE_DOWN:
+    return data[0];
+  case SHUFFLE_XOR:
+    return data[0];
+  default:
+    return data[0];
+  }
 }
 
 int main() {
@@ -111,23 +159,39 @@ int main() {
   if (err != cudaSuccess) {
     printf("CUDA Error: %s\n", cudaGetErrorString(err));
   }
-  test_warp_reduce_function<Operation::ADD><<<BLOCKS, THREADS>>>(data_d,
-                                                                result_d);
+  test_warp_reduce_function<Operation::ADD>
+      <<<BLOCKS, THREADS>>>(data_d, result_d);
   cudaMemcpy(result, result_d, sizeof(int), cudaMemcpyDeviceToHost);
-  assert(cpu_reduce_function<Operation::ADD>(data) == *result && "Not verified");
-  test_warp_reduce_function<Operation::AND><<<BLOCKS, THREADS>>>(data_d,
-                                                                result_d);
+  assert(cpu_reduce_function<Operation::ADD>(data) == *result &&
+         "Not verified");
+  test_warp_reduce_function<Operation::AND>
+      <<<BLOCKS, THREADS>>>(data_d, result_d);
   cudaMemcpy(result, result_d, sizeof(int), cudaMemcpyDeviceToHost);
-  assert(cpu_reduce_function<Operation::AND>(data) == *result && "Not verified");
-  test_warp_reduce_function<Operation::OR><<<BLOCKS, THREADS>>>(data_d,
-                                                                result_d);
+  assert(cpu_reduce_function<Operation::AND>(data) == *result &&
+         "Not verified");
+  test_warp_reduce_function<Operation::OR>
+      <<<BLOCKS, THREADS>>>(data_d, result_d);
   cudaMemcpy(result, result_d, sizeof(int), cudaMemcpyDeviceToHost);
   assert(cpu_reduce_function<Operation::OR>(data) == *result && "Not verified");
-  test_warp_reduce_function<Operation::XOR><<<BLOCKS, THREADS>>>(data_d,
-                                                                result_d);
+  test_warp_reduce_function<Operation::XOR>
+      <<<BLOCKS, THREADS>>>(data_d, result_d);
   cudaMemcpy(result, result_d, sizeof(int), cudaMemcpyDeviceToHost);
   assert(cpu_reduce_function<Operation::XOR>(data) == *result &&
          "Not verified");
+  test_warp_shuffle_function<Shuffle_Operation::SHUFFLE_UP>
+      <<<BLOCKS, THREADS>>>(data_d, result_d);
+  cudaMemcpy(result, result_d, sizeof(int), cudaMemcpyDeviceToHost);
+  assert(cpu_shuffle_function<Shuffle_Operation::SHUFFLE_UP>(data) == *result &&
+         "Not verified");
+  test_warp_shuffle_function<Shuffle_Operation::SHUFFLE_DOWN>
+      <<<BLOCKS, THREADS>>>(data_d, result_d);
+  cudaMemcpy(result, result_d, sizeof(int), cudaMemcpyDeviceToHost);
+  assert(cpu_shuffle_function<Shuffle_Operation::SHUFFLE_DOWN>(data) ==
+             *result &&
+         "Not verified");
+  test_warp_shuffle_function<Shuffle_Operation::SHUFFLE_XOR>
+      <<<BLOCKS, THREADS>>>(data_d, result_d);
+
   free(data);
   cudaFree(data_d);
   cudaFree(result_d);
